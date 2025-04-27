@@ -223,6 +223,8 @@ The included docker-compose.yml file sets up a complete trading infrastructure:
 
 ## 🔧 Available Tools
 
+> This project makes use of my other project [Bybit MCP Server](https://github.com/andrefigueira93/bybit_mcp_server) - Checkout for more info 😁
+
 | Tool                      | Description                                      |
 | ------------------------- | ------------------------------------------------ |
 | `get_balance`             | Retrieves current wallet balance                 |
