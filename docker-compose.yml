@@ -1,0 +1,84 @@
+version: '3'
+
+services:
+  bybit-mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bybit-mcp-server
+    hostname: bybit-mcp-server
+    restart: unless-stopped
+    ports:
+      - '8000:8000' # Expose on port 80 externally, map to 8000 internally
+    environment:
+      - BYBIT_API_KEY=${BYBIT_API_KEY}
+      - BYBIT_API_SECRET=${BYBIT_API_SECRET}
+      - BYBIT_TESTNET=${BYBIT_TESTNET:-True}
+      - MCP_BASE_URL=http://bybit-mcp-server:8000
+    volumes:
+      - ./logs:/app/logs # Mount logs directory
+    networks:
+      - mcp-network
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: n8n-mcp
+    restart: unless-stopped
+    ports:
+      - '5678:5678'
+    environment:
+      - N8N_HOST=n8n-mcp
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - NODE_ENV=production
+      - WEBHOOK_URL=http://0.0.0.0:5678/
+      - N8N_REDIS_HOST=redis-mcp
+      - N8N_REDIS_PASSWORD=redis_password
+      - N8N_DB_TYPE=postgresdb
+      - N8N_DB_POSTGRESDB_HOST=postgres-mcp
+      - N8N_DB_POSTGRESDB_PORT=5432
+      - N8N_DB_POSTGRESDB_DATABASE=postgres
+      - N8N_DB_POSTGRESDB_USER=postgres
+      - N8N_DB_POSTGRESDB_PASSWORD=postgres
+    volumes:
+      - ./n8n-data:/home/node/.n8n
+    networks:
+      - mcp-network
+    depends_on:
+      - postgres
+      - redis
+
+  postgres:
+    image: timescale/timescaledb-ha:pg15
+    container_name: postgres-mcp
+    restart: unless-stopped
+    ports:
+      - '5432:5432'
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+      - ./init-vector.sql:/docker-entrypoint-initdb.d/init-vector.sql
+    networks:
+      - mcp-network
+
+  redis:
+    image: redis:latest
+    container_name: redis-mcp
+    restart: unless-stopped
+    command: redis-server --requirepass redis_password --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    ports:
+      - '6379:6379'
+    environment:
+      - REDIS_PASSWORD=redis_password
+    networks:
+      - mcp-network
+    volumes:
+      - ./redis-data:/data
+
+# Network configuration
+networks:
+  mcp-network:
+    driver: bridge

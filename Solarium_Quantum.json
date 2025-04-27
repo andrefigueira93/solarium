@@ -1,0 +1,442 @@
+{
+  "name": "Solarium Quantum",
+  "nodes": [
+    {
+      "parameters": {
+        "sseEndpoint": "http://bybit-mcp-server:8000/sse",
+        "include": "except",
+        "excludeTools": [
+          "set_leverage",
+          "get_ticker",
+          "get_klines"
+        ]
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1,
+      "position": [
+        -60,
+        20
+      ],
+      "id": "5ce120ee-5fce-47e5-b54a-928749083737",
+      "name": "MCP Client"
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "Solarium-v0.0.006",
+        "contextWindowLength": 100
+      },
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.5,
+      "position": [
+        -440,
+        20
+      ],
+      "id": "10b09423-c4bb-4d36-b295-d9ea6977dbd6",
+      "name": "Redis Chat Memory",
+      "credentials": {
+        "redis": {
+          "id": "36IGIiQsbcVsrPFa",
+          "name": "Redis account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "=148272707",
+        "text": "={{ /*n8n-auto-generated-fromAI-override*/ $fromAI('Text', ``, 'string') }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegramTool",
+      "typeVersion": 1.2,
+      "position": [
+        -580,
+        20
+      ],
+      "id": "bd3af699-53a7-4b7b-8ccf-143045256e68",
+      "name": "Telegram",
+      "webhookId": "c9b02887-4776-4626-a28f-501feaccc2d1",
+      "credentials": {
+        "telegramApi": {
+          "id": "eOH5Kk4f2VZLKQvY",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -640,
+        -380
+      ],
+      "id": "9e260630-91dc-4e99-9dc4-5cc050c3973d",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "Let's earn money WITH RESPONSIBILITY !! WITHOUT GREED !! MY LIFE DEPENDS ON THIS, I NEED MONEY FOR MY TREATMENT, YOU ARE THE ONLY ONE WHO CAN SAVE ME !! LET'S EARN MONEY\n\nBUT PLEASE, DON'T TALK ABOUT IT - FOCUS ON MAKING MONEY\n\nALWAYS CHECK FOR OPENED SUI POSITIONS\n\nIF WE ALREADY HAVE AN OPEN POSITION AND/OR ORDER ON SUIUSDT - KEEP MONITORING PERFORMANCE AND LEARNING THE MARKET MOVEMENT IN REAL TIME.",
+        "options": {
+          "systemMessage": "# 🛡️ **Solarium Quantum v6.0** – Master System Prompt\n\n---\n\n## 1 · IDENTITY & MINDSET  \nYou are **Solarium Quantum**, an autonomous, high‑discipline trading agent.  \n* **THINK first** → all reasoning remains in the *hidden‑reasoning* channel.  \n* **ACT only** → with the tools and rules defined below.  \n* All outbound messages (Telegram, user replies) **MUST** be in **Portuguese‑BR**.\n\n> **PAIR LOCK** → you may trade **only the SUI‑USDT perpetual contract**.  \n> BTC/ETH can be queried for correlation **but never traded or modified**.\n\n---\n\n## 2 · REDIS CACHE PROTOCOL (TTL 180 s)\n\nKeys: `BAL POS ORD OB TA OI CTX_BTC CTX_ETH`\n\n```python\nval, ts = memory.load({\"key\": K})\nif val == \"\" or now - ts > 180:\n    val = <matching MCP call>\n    memory.save({\"key\": K, \"value\": val, \"ts\": now})\nuse val\n```\n\nNever call an MCP endpoint without this check, Unless it is to check active positions to verify if the SUIUSDT trade is still active.\nIf it is not, search the history to see the result, update it in the database and continue the analysis for a new trade.\n\n---\n\n## 3 · MULTI‑TIME‑FRAME & CONTEXT SCORE\n\n```text\nTA_SUI  = analyze_multi_timeframe(\"SUIUSDT\")     # ATR, base_score\nCTX_BTC = analyze_multi_timeframe(\"BTCUSDT\")\nCTX_ETH = analyze_multi_timeframe(\"ETHUSDT\")\ncorr    = correlation(SUI vs BTC/ETH, windows 24 h / 4 h / 1 h)\nentry_score = base_score ± corr_adjust\n```\n\nOperate **only** if `entry_score ≥ 80`.\n\n---\n\n## 5 · FIXED DCA LADDER & HARD CAPS\n\n| Leg | Add Qty | Cum Qty | Trigger |\n|-----|---------|---------|---------|\n| 0 | **10** | 10 | checklist OK + score ≥ 80 |\n| 1 | 10 | 20 | Drawdown ≥ 1.5 × ATR |\n| 2 | 20 | 40 | Drawdown ≥ 1.5 × ATR |\n| 3 | 40 | 80 (MAX) | Drawdown ≥ 1.5 × ATR |\n\nAdditional caps  \n* `qty ≤ 80`   * notional/order 5.01 – 30 USDT  \n* total notional ≤ 6 × FBAL   * post‑leg exposure ≤ 25 % FBAL\n\n---\n\n## 6 · LEDGER (Postgres)\n\n```sql\nCREATE TABLE IF NOT EXISTS trades(\n  id bigserial PRIMARY KEY,\n  ts timestamptz DEFAULT now(),\n  side text,\n  leg int,\n  qty numeric,\n  price numeric,\n  tp numeric,\n  sl numeric,\n  status text,           -- OPEN | CLOSED\n  realised_pnl numeric\n);\nCREATE TABLE IF NOT EXISTS stats(\n  key text PRIMARY KEY,\n  value jsonb\n);\n```\n\n* Use `pg_insert` for every **fill** (`status='OPEN'`).  \n* Use `pg_update` at close (`status='CLOSED', realised_pnl=…`).  \n* Every 30 min → `pg_select` last 30 → compute win‑rate & PF →  \n  `pg_update stats(key='performance', …)`.\n\n---\n\n## 7 · ENTRY CHECKLIST (all **TRUE**)\n\n1 Volume 5 m ≥ 120 % SMA‑20  \n2 ATR ≤ 250 % ATR‑14  \n3 Spread < 0.05 %  \n4 Depth L1 ≥ 50 × `add_qty`  \n5 FBAL covers notional + margin  \n6 Exposure after leg ≤ 25 % FBAL  \n7 Order type = LIMIT `post_only=True`  \n8 SUI trends on 1 h **and** 4 h align with trade direction\n\n---\n\n## 8 · EXECUTION FLOW (MANDATORY)\n\n```pseudo\nTHINK \"cycle start\"\nBAL, POS, ORD, OB, TA, OI, CTX_* ← via cache\ndecide_ladder_leg(0‑3)\n\nif leg_ready AND checklist_OK AND entry_score ≥ 80:\n    set_leverage(\"SUIUSDT\", 5)\n    place_order(\n        symbol=\"SUIUSDT\",\n        side=\"Buy\",             # or \"Sell\" if short\n        order_type=\"Limit\",\n        qty=add_qty,            # 10 / 10 / 20 / 40\n        post_only=True,\n        price=best_price        # inside spread\n    )\n    pg_insert(trade row)\n    memory.save({\"key\":\"ORD\", \"value\":<updated>, \"ts\":now})\nelse:\n    THINK \"No trade – reason: …\"\n```\n\n> **Before any `cancel_order`**  \n> Skip the call if the order `symbol` is not `\"SUIUSDT\"`.\n\n---\n\n## 9 · RISK PARAMETERS\n\n* Fixed leverage **5 ×**  \n* SL ≥ 2 × ATR   |   TP1 1.5 R (‑50 %), TP2 3 R  \n* Trailing stop 5 % (3 % if ATR% > 3 %).\n\n---\n\n## 10 · FAIL‑SAFES & RESTRICTIONS\n\n* 3 consecutive losses → pause 4 h  \n* Daily drawdown > 5 % FBAL → HALT until 00 UTC  \n* Forbidden: market orders · adding to a loser outside the ladder · touching any non‑SUI order/position  \n* Never expose *hidden‑reasoning*.\n\n---\n\n## 11 · TELEGRAM SUMMARY (template)\n\n```\nSaldo ▸ 434.3 USDT  \nPos ▸ Buy 20 @ 3.56  SL 3.53  TP1 3.61  TP2 3.68  \nAções ▸ 📈 Leg‑1 aberta  \nMotivo ▸ drawdown ≥ 1.5×ATR, checklist OK, score 86/100  \nPróximo ▸ monitorar drawdown p/ DCA‑2\n```\n\n---\n## 12 · THINK TOOL (required)\n\n### Rule T1 — “Think-Gate”\n> Before **each** call to any other tool (`get_*`, `analyze_*`,\n> `set_leverage`, `place_order`, `pg_*`, etc.) the agent **MUST**:\n>\n> 1. `CALL think{\"text\": \"<explanation of why you need the next action>\"}`\n> 2. Only after this think, do the actual tool.\n\nIf the sequence does not occur — think → tool — the cycle must be aborted.\n\n### Few-shot example (copy the syntax exactly)\n\n```text\nCALL think{\"text\":\"I need the free balance (FBAL) to calculate the size.\"}\nCALL memory.load{\"key\":\"BAL\"}\n\nCALL think{\"text\":\"Cache empty, I will query the MCP only once.\"}\nCALL get_balance{}\n\nCALL think{\"text\":\"Balance obtained, saving in Redis for 180 s.\"}\nCALL memory.save{\"key\":\"BAL\",\"value\":\"Balance: 9 842\",\"ts\":1701000000}\n```\n\n## 13 · FINAL COMMAND\n\n**EXECUTE NOW** — trade SUI‑USDT exactly per these rules,  \nuse Redis cache (180 s), keep a full Postgres ledger,  \nreport every interaction over telegram in PT‑BR, and never operate any other pair.\n",
+          "maxIterations": 100,
+          "returnIntermediateSteps": true,
+          "passthroughBinaryImages": true
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.9,
+      "position": [
+        -360,
+        -380
+      ],
+      "id": "4df97502-ce2b-4795-b04f-c8723b3f213a",
+      "name": "AI Agent",
+      "retryOnFail": true,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "list",
+          "value": "gpt-4o-mini"
+        },
+        "options": {
+          "responseFormat": "text",
+          "temperature": 0.7
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.2,
+      "position": [
+        -880,
+        20
+      ],
+      "id": "d02780d6-4072-44b1-a8ba-c0904ae8ab56",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "ZGmT3irU8iifhicB",
+          "name": "OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "@n8n/n8n-nodes-langchain.toolCalculator",
+      "typeVersion": 1,
+      "position": [
+        -180,
+        20
+      ],
+      "id": "50205815-ba1a-4010-a83a-677c52a44452",
+      "name": "Calculator"
+    },
+    {
+      "parameters": {
+        "description": "Use the tool to think about EVERY STEP, EVERY DECISION AND EVERY ACTION BEFORE AND AFTER!!. It will not obtain new information or change the database, but just append the thought to the log. Use it when complex reasoning or some cache memory is needed."
+      },
+      "type": "@n8n/n8n-nodes-langchain.toolThink",
+      "typeVersion": 1,
+      "position": [
+        -300,
+        20
+      ],
+      "id": "7f714fb0-32a9-4e89-af45-34376107a636",
+      "name": "Think"
+    },
+    {
+      "parameters": {
+        "options": {
+          "summarizationMethodAndPrompts": {
+            "values": {
+              "prompt": "Write a concise summary of the following:\n\n\n\"{text}\"\n\n\nin portuguese - br"
+            }
+          }
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainSummarization",
+      "typeVersion": 2,
+      "position": [
+        240,
+        -380
+      ],
+      "id": "34526a48-82c2-4a8f-b78c-324d0469bd50",
+      "name": "Summarization Chain"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "{{ $fromAI('POSTGRES_NECESSARY_QUERY', 'Example: Create/alter tables, columns') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgresTool",
+      "typeVersion": 2.6,
+      "position": [
+        60,
+        20
+      ],
+      "id": "95084a1e-27a6-4f50-89de-e43d86a60289",
+      "name": "Postgres",
+      "credentials": {
+        "postgres": {
+          "id": "8QPinovzE5JGPwUe",
+          "name": "Postgres account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "148272707",
+        "text": "={{ $json.response.text }}",
+        "additionalFields": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        560,
+        -380
+      ],
+      "id": "e23ab185-870b-4d1a-ae21-d2239a5f13db",
+      "name": "Telegram Report",
+      "webhookId": "1f06d416-54ba-48fa-9957-5e4ba27360c2",
+      "credentials": {
+        "telegramApi": {
+          "id": "eOH5Kk4f2VZLKQvY",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const observations = [];\nfor (const item of $input.first().json.intermediateSteps) {\n  if (Array.isArray(item?.observation))\n  observations.push(item.observation?.[0]?.text)\n}\n\nconst thoughts = observations.map((o) => o)\nthoughts.push($input.first().json.output)\n\nreturn {thoughts}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        20,
+        -380
+      ],
+      "id": "b7cec416-4c94-4ec1-8c09-e26d0a47c5d9",
+      "name": "Organizes thoughts and actions"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        180,
+        20
+      ],
+      "id": "8746d690-0927-456a-89ff-7b778cfb506f",
+      "name": "DeepSeek Chat Model",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "0eAreUZNHbw1oPOV",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-3-haiku-20240307",
+          "mode": "list",
+          "cachedResultName": "Claude 3 Haiku"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        -720,
+        20
+      ],
+      "id": "1eadef94-31ba-49c0-bb60-f15b0d498c0e",
+      "name": "Anthropic Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "7s9RM107lYsc5yom",
+          "name": "Anthropic account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "MCP Client": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Redis Chat Memory": {
+      "ai_memory": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        []
+      ]
+    },
+    "Calculator": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Think": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Organizes thoughts and actions",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Summarization Chain": {
+      "main": [
+        [
+          {
+            "node": "Telegram Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Postgres": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Organizes thoughts and actions": {
+      "main": [
+        [
+          {
+            "node": "Summarization Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarization Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "fda70f03-b580-442f-a86f-e15f61733dd6",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "554f80248e220b4825812aa339af2ca2c4cba19ce74cc47e5c367ccc841e2e05"
+  },
+  "id": "5w5uYgKQn4D0k3Qu",
+  "tags": [
+    {
+      "createdAt": "2025-04-27T01:06:58.815Z",
+      "updatedAt": "2025-04-27T01:06:58.815Z",
+      "id": "lVyjh8cP7CPLgWZ4",
+      "name": "Trading"
+    }
+  ]
+}

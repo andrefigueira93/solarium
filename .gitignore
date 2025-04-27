@@ -1,0 +1,7 @@
+.venv
+.env
+bybit_mcp_server.egg-info
+__pycache__
+n8n-data
+postgres-data
+redis-data
