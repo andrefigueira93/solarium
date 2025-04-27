@@ -16,7 +16,7 @@
 
 ## 🌟 Overview
 
-Solarium Quantum is a powerful AI Agent which performs trades [Bybit API](https://bybit-exchange.github.io/docs/v5/intro) through the Machine Context Protocol (MCP). It transforms raw market data into actionable insights, enabling sophisticated algorithmic trading strategies, real-time market analysis, and automated execution systems.
+Solarium Quantum is a powerful AI Agent which performs trades [Bybit API](https://bybit-exchange.github.io/docs/v5/intro) through the Model Context Protocol (MCP). It transforms raw market data into actionable insights, enabling sophisticated algorithmic trading strategies, real-time market analysis, and automated execution systems.
 
 ### What Makes This Project Special
 
