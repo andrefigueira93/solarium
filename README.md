@@ -114,9 +114,14 @@ mcp run main.py -t sse
 >
 > - Setup your user
 > - Setup your preferred model credentials
+> - Setup redis and postgres connection (ref: docker-compose.yml for credentials)
 > - Setup your Telegram Bot credentials for trade notifications
-> - Import Solarium_Quantum.json Workflow
-> - Customize prompts as you want. Default trades are on SUIUSDT
+> - Import Solarium_Quantum.json Workflow and config the nodes.
+> - Customize prompts as you want.
+> - Default trades are on SUIUSDT.
+>
+> - Ready to go!
+>   
 
 ## 🔌 Architecture
 
@@ -258,6 +263,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## ⚠️ Disclaimer
 
 **Trading cryptocurrencies involves significant risk and can result in the loss of your invested capital. This software is delivered "as is" and is not financial advice. Always do your own research before trading.**
+
+**I AM NOT RESPONSIBLE FOR ANYONE'S FINANCIAL LOSSES!**
+**USE THIS PROJECT AT YOUR OWN RISK!**
 
 ---
 
